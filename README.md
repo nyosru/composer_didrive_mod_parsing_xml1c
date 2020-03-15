@@ -1,2 +1,2 @@
-# composer_didrive_mod_parsing_xml1c
-парсинг 1с файла (для автоАС)
+# composer_didrive_parsing_autoas_1c
+АвтоАС - Парсинг xml дата файла (экспорт с 1с) и запись его в БД 
