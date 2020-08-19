@@ -6,8 +6,8 @@
 
 namespace Nyos\mod;
 
-if (!defined('IN_NYOS_PROJECT'))
-    throw new \Exception('Сработала защита от розовых хакеров, обратитесь к администрратору');
+//if (!defined('IN_NYOS_PROJECT'))
+//    throw new \Exception('Сработала защита от розовых хакеров, обратитесь к администрратору');
 
 class parsing_xml1c {
 
@@ -32,113 +32,140 @@ class parsing_xml1c {
      */
     public static function parsingXmlImport($db, $folder = null, $mod_cats = '020.cats', $mod_items = '021.items') {
 
-        if (isset($_REQUEST['clear'])) {
-            \Nyos\mod\items::deleteFromDops($db, self::$mod_cats);
-            \Nyos\mod\items::deleteFromDops($db, self::$mod_items);
-        } else {
+        try {
 
-            \f\timer_start(223);
+            echo '</br><h3>'.__FUNCTION__.' '.__FILE__.' #'.__LINE__.'</h3>';
+            
+            if (isset($_REQUEST['clear'])) {
 
-            $res = self::scanNewDataFile($db, $folder);
-            \f\pa($res, 2, '', 'res self::scanNewDataFile');
+                \Nyos\mod\items::deleteFromDops($db, self::$mod_cats);
+                \Nyos\mod\items::deleteFromDops($db, self::$mod_items);
 
-            if (isset($_REQUEST['show']))
-                echo '<br/>step 1 : ' . \f\timer_stop(223);
+            } else {
 
-            /**
-             * если не пустой массив с каталогами, то сравниваем и добавляем
-             */
-            if (isset($_REQUEST['show']))
-                echo '<br/>#' . __LINE__ . ' + cat';
-            if (isset($_REQUEST['show']))
-                echo '<div style="border: 1px solid red; padding: 15px; margin: 15px;" >';
+                \f\timer_start(223);
 
-            \f\timer_start(2);
+                $res = self::scanNewDataFile($db, $folder);
+                \f\pa($res, 2, '', 'res self::scanNewDataFile');
 
-            // добавляем каталоги
-            if (1 == 1) {
-
-                // \f\pa($cats_in, 2);
-                $cats_now = \Nyos\mod\items::get($db, self::$mod_cats);
                 if (isset($_REQUEST['show']))
-                    \f\pa($cats_now, 2, '', 'cats now');
+                    echo '<br/>step 1 : ' . \f\timer_stop(223);
 
-                $different = self::differentArray($cats_now, $res['data']['cats']);
+                /**
+                 * если не пустой массив с каталогами, то сравниваем и добавляем
+                 */
                 if (isset($_REQUEST['show']))
-                    \f\pa($different, 2, '', '$different cat');
+                    echo '<br/>#' . __LINE__ . ' + cat';
 
-                $link_cat = [];
-                foreach ($cats_now as $cat) {
-                    if (!isset($link_cat[$cat['a_id']]))
-                        $link_cat[$cat['a_id']] = $cat['id'];
-                }
                 if (isset($_REQUEST['show']))
-                    \f\pa($link_cat, 2, '', '$link_cat');
+                    echo '<div style="border: 1px solid red; padding: 15px; margin: 15px;" >';
 
-                $new_cats = [];
-                foreach ($different['new'] as $c) {
-                    if (isset($c['a_parentId'])) {
-                        if (isset($link_cat[$c['a_parentId']])) {
-                            $c['up_id'] = $link_cat[$c['a_parentId']];
+                \f\timer_start(2);
+
+                // добавляем каталоги
+                if (1 == 1) {
+
+                    // \f\pa($cats_in, 2);
+                    $cats_now = \Nyos\mod\items::get($db, self::$mod_cats);
+
+                    if (isset($_REQUEST['show']))
+                        \f\pa($cats_now, 2, '', 'cats now');
+
+                    $different = self::differentArray($cats_now, $res['data']['cats']);
+                    if (isset($_REQUEST['show']))
+                        \f\pa($different, 2, '', '$different cat');
+
+                    $link_cat = [];
+                    foreach ($cats_now as $cat) {
+                        if (!isset($link_cat[$cat['a_id']]))
+                            $link_cat[$cat['a_id']] = $cat['id'];
+                    }
+
+                    if (isset($_REQUEST['show']))
+                        \f\pa($link_cat, 2, '', '$link_cat');
+
+                    $new_cats = [];
+                    foreach ($different['new'] as $c) {
+                        if (isset($c['a_parentId'])) {
+                            if (isset($link_cat[$c['a_parentId']])) {
+                                $c['up_id'] = $link_cat[$c['a_parentId']];
+                                $new_cats[] = $c;
+                            }
+                        } else {
                             $new_cats[] = $c;
                         }
-                    } else {
-                        $new_cats[] = $c;
                     }
+
+                    if (isset($_REQUEST['show']))
+                        \f\pa($new_cats, 2, '', '$new_cats');
+
+                    \Nyos\mod\items::addNewSimples($db, self::$mod_cats, $new_cats);
+
+                    unset($new_cats, $cats_now);
                 }
 
                 if (isset($_REQUEST['show']))
-                    \f\pa($new_cats, 2, '', '$new_cats');
+                    echo '<br/>timer : ' . \f\timer_stop(2);
 
-                \Nyos\mod\items::addNewSimples($db, self::$mod_cats, $new_cats);
+                // return [ 'cats' => $cats_now, 'diff' => $different ];
+                // \f\pa($res2, 2, '', 'res self::differentCats');
 
-                unset($new_cats, $cats_now);
-            }
+                if (isset($_REQUEST['show']))
+                    echo '</div>';
 
-            if (isset($_REQUEST['show']))
-                echo '<br/>timer : ' . \f\timer_stop(2);
+                echo '<br/>добавляем итемы';
 
-            // return [ 'cats' => $cats_now, 'diff' => $different ];
-            // \f\pa($res2, 2, '', 'res self::differentCats');
-            if (isset($_REQUEST['show']))
-                echo '</div>';
+                $items_old = \Nyos\mod\items::get_older($db, self::$mod_items);
+                \f\pa($items_old, 2, '', '$items_old');
 
-            echo '<br/>добавляем итемы';
+                //\f\pa($res['data']['items'], 2, '', '$res[data][items]');
 
-            $items_old = \Nyos\mod\items::get($db, self::$mod_items);
-            \f\pa($items_old, 2, '', '$items_old');
-            //\f\pa($res['data']['items'], 2, '', '$res[data][items]');
-
-            $diff_items = self::differentArray($items_old, $res['data']['items']);
-            \f\pa($diff_items, 2, '', '$diff_items');
-
-            \f\pa($link_cat, 2, '', '$link_cat');
+                $diff_items = self::differentArray($items_old, $res['data']['items']);
+                \f\pa($diff_items, 2, '', '$diff_items');
 
 
-            $nn = 0;
-            $in_db = [];
-            foreach ($diff_items['new'] as $item) {
-                if (!empty($item['a_categoryId'])) {
-                    if (!empty($link_cat[$item['a_categoryId']])) {
+                \f\pa($link_cat, 2, '', '$link_cat');
 
-                        if ($nn >= 300)
-                            break;
 
-                        $nn++;
+                $nn = 0;
+                $in_db = [];
+                foreach ($diff_items['new'] as $item) {
 
-                        $item['cat_id'] = $link_cat[$item['a_categoryId']];
-                        if( !empty($item['a_catNumber']) )
-                        $item['catNumber_search'] = \f\translit($item['a_catNumber'], 'cifru_bukvu');
-                        $in_db[] = $item;
+                    if (!empty($item['a_categoryId'])) {
+
+                        if (!empty($link_cat[$item['a_categoryId']])) {
+
+                            if ($nn >= 300)
+                                break;
+
+                            $nn++;
+                            $item['cat_id'] = $link_cat[$item['a_categoryId']];
+
+                            if (!empty($item['a_catNumber']))
+                                $item['catNumber_search'] = \f\translit($item['a_catNumber'], 'cifru_bukvu');
+
+                            $in_db[] = $item;
+                        }
                     }
                 }
+
+                \Nyos\mod\items::addNewSimples($db, self::$mod_items, $in_db);
+                echo '<br/>#' . __LINE__ . ' добавлено товаров ' . sizeof($in_db);
+
+                // \f\pa($re, 2, '', '$re');
             }
 
-            \Nyos\mod\items::addNewSimples($db, self::$mod_items, $in_db);
+            return \f\end3($html, true, ['new_item' => sizeof($indb)]);
+        } catch (\Exception $exc) {
 
-            echo '<br/>#' . __LINE__ . ' добавлено товаров ' . sizeof($in_db);
-
-            // \f\pa($re, 2, '', '$re');
+            // echo $exc->getTraceAsString();
+            \f\pa($exc);
+            return \f\end3('ошибка ' . $exc->getMessage(), true, $exc);
+            
+        } finally{
+            
+            die('#'.__LINE__);
+            
         }
 
 
