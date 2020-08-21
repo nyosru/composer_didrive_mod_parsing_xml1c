@@ -9,760 +9,475 @@ namespace Nyos\mod;
 //if (!defined('IN_NYOS_PROJECT'))
 //    throw new \Exception('Сработала защита от розовых хакеров, обратитесь к администрратору');
 
-class parsing_xml1c {
+class IikoChecks {
 
-    public static $mod_cats = '020.cats';
-    public static $mod_items = '021.items';
-
-//    public static $dir_img_server = false;
-//
-//    public static function creatFolderImage($folder) {
-//        /**
-//
-//         * */
-//    }
+    public static $dir_img_server = false;
 
     /**
-     * парсинг и запись данных из файла xml
+     * 
      * @param type $db
-     * @param type $folder
-     * @param type $mod_cats
-     * @param type $mod_items
+     * @param type $otrezok
+     * / час - ищем тех у кого больше часа последний чек
+     * / день - ищем тех у кого больше часа последний чек
+     * / 3дня - ищем тех у кого больше часа последний чек
      * @return type
      */
-    public static function parsingXmlImport($db, $folder = null, $mod_cats = '020.cats', $mod_items = '021.items') {
+    public static function getUserForLoad($db, $otrezok = null) {
+
+        $ff = $db->prepare('SELECT 
+                    mi.id,
+                    mi.head,
+                    mid.value user_iiko_id,
+                    
+                    mi2.id last_checks_id,
+                    
+                    mid3.id last_job_id '
+                . ', '
+                . '  mid2.value_datetime last_import '
+                // . ( $otrezok == 'час' ? ' , mid25.value_datetime searched , datetime( \''.date( 'Y-m-d H:i:s', $_SERVER['REQUEST_TIME'] ).'\',\'+1 hours\' ) search  ' : '' )
+                // . ( $otrezok == 'час' ? ' , mid25.value_datetime searched ' : '' )
+                . '
+
+                FROM 
+
+                    mitems mi
+
+                INNER JOIN `mitems-dops` mid ON mid.id_item = mi.id AND mid.name = \'iiko_id\'
+
+
+                INNER JOIN `mitems` mi3 ON mi3.status = \'show\' AND mi3.module = \'jobman_send_on_sp\'
+                INNER JOIN `mitems-dops` mid31 ON mid31.id_item = mi3.id AND mid31.name = \'jobman\' AND mid31.value = mi.id '
+                . ' LEFT JOIN `mitems-dops` mid3 ON mid3.id_item = mi2.id AND mid3.name = \'jobman\' AND mid3.value = mi.id
+                LEFT JOIN `mitems` mi2 ON mi2.status = \'show\' AND mi2.module = \'081.job_checks_from_iiko\' ' .
+                ' LEFT JOIN `mitems-dops` mid2 ON mid2.id_item = mi2.id AND mid2.name = \'data\' ' // 'AND mid2.value < :date '
+                . ( $otrezok == 'час' ? ' INNER JOIN `mitems-dops` mid25 ON mid25.id = mid2.id AND mid25.value_datetime < datetime( \'' . date('Y-m-d H:i:s', $_SERVER['REQUEST_TIME']) . '\',\'-1 hours\' )  ' : '' )
+                . '
+
+                WHERE
+
+                    mi.module = :mod1 AND
+                    mi.status = \'show\' 
+                GROUP BY 
+                    mi.id
+
+                ORDER BY '
+                . ' mi3.id DESC '
+                . ' , mi2.id DESC '
+                . ' , mid2.value_datetime ASC '
+
+                // . ' LIMIT 10 '
+                . '
+                
+                ;');
+
+        $ff->execute(array(
+            // ':id_user' => 'f34d6d84-5ecb-4a40-9b03-71d03cb730cb',
+            ':mod1' => '070.jobman',
+                // ':date' => ' date(\'' . date('Y-m-d', $_SERVER['REQUEST_TIME'] - 3600*24*3 ) .'\') ',
+                // ':dates' => $start_date //date( 'Y-m-d', ($_SERVER['REQUEST_TIME'] - 3600 * 24 * 14 ) )
+        ));
+        //$e3 = $ff->fetchAll();
+
+        $e = $ff->fetchAll();
+        //\f\pa($e);
+
+        return $e;
+    }
+
+    /**
+     * считаем сколько часов между двух точек времени (старая версия, не использовать)
+     * ( обновлённая версия 1912201602 > calculateHoursInRangeUnix )
+     * @param dt $start
+     * @param dt $end
+     * @return string
+     */
+    public static function calculateHoursInRange(string $start, $end = null) {
+
+        if ($end === null)
+            return null;
+
+        return ceil(( ( ceil(strtotime($start) / 1800) * 1800 ) - ( ceil(strtotime($end) / 1800) * 1800 ) ) / 1800) / 2;
+    }
+
+    /**
+     * считаем сколько времени отталкиваясь от юникс дат (в секундах)
+     * версия от 1912201602
+     * @param string $start
+     * @param type $end
+     * @return type
+     */
+    public static function calculateHoursInRangeUnix($start, $end) {
+
+        if (!empty($start) && is_numeric($start) && !empty($end) && is_numeric($end)) {
+            return ceil(( ( ceil($end / 1800) * 1800 ) - ( ceil($start / 1800) * 1800 ) ) / 1800) / 2;
+        } 
+        // ошибка или пришли не цифры или пустые значения
+        else {
+            return null;
+        }
+    }
+
+    /**
+     * считаем количество часов в смене
+     * @param string $start
+     * @param type $end
+     * @return type
+     */
+    public static function calcHoursInSmena(string $start, $end = null) {
+
+        if ($end === null)
+            return null;
+
+        return ceil(( ( ceil(strtotime($end) / 1800) * 1800 ) - ( ceil(strtotime($start) / 1800) * 1800 ) ) / 1800) / 2;
+    }
+
+    /**
+     * достаём чеки сотрудника за несколько дней
+     * @param type $array_on_server
+     * @param type $checks
+     */
+    public static function getChecksJobmanLastDays($db, int $user_id, $what_day_to_diff = 3, $module_jobman = '070.jobman', $module_checks = '050.chekin_checkout') {
+
+        $sql = 'SELECT 
+        
+                    mi.id, 
+                    
+                    mid2.value_datetime start,
+                    
+                    mid3.id itemsdop_end_id,
+                    mid3.value_datetime fin,
+                    mid31.value hour_on_job,
+                    mid4.value ocenka,
+                    mid5.value pay
+                    
+                FROM 
+                
+                    mitems mi
+
+                INNER JOIN `mitems-dops` mid ON mid.id_item = mi.id AND mid.name = \'jobman\' AND mid.value = :id_user
+                INNER JOIN `mitems-dops` mid2 ON mid2.id_item = mi.id AND mid2.name = \'start\' AND mid2.value_datetime >= :search_to_date
+                
+                LEFT JOIN `mitems-dops` mid3 ON mid3.id_item = mi.id AND mid3.name = \'fin\' 
+                LEFT JOIN `mitems-dops` mid31 ON mid31.id_item = mi.id AND mid31.name = \'hour_on_job_calc\' 
+                LEFT JOIN `mitems-dops` mid4 ON mid4.id_item = mi.id AND mid4.name = \'ocenka\' 
+                LEFT JOIN `mitems-dops` mid5 ON mid5.id_item = mi.id AND mid5.name = \'pay_buh\' 
+
+                WHERE
+
+                    mi.module = :mod_checks AND
+                    mi.status = \'show\' 
+                    
+        ';
+        // echo '</pre>';
+
+        $ff = $db->prepare($sql);
+
+        // $dt = date('Y-m-d 00:00:00', ( $_SERVER['REQUEST_TIME'] - 3600 * 24 * $day_checked));
+        // echo '<br/>ищем значение >= ' . $dt;
+
+        $ff->execute(array(
+            ':search_to_date' => ' datetime(\'now\',\'-' . $what_day_to_diff . ' day\') ',
+            // ':mod_user' => $module_jobman,
+            ':mod_checks' => $module_checks,
+            ':id_user' => $user_id,
+                // ':mod1' => '070.jobman',
+                //':start_date' => ' date(\'' . date('Y-m-d 00:00:00', ( $_SERVER['REQUEST_TIME'] - 3600 * 24 * $day_checked ) ) . '\') ',
+                //':start_date' => ' date( \'' . $dt . '\' ) ',
+                // ':dates' => $start_date //date( 'Y-m-d', ($_SERVER['REQUEST_TIME'] - 3600 * 24 * 14 ) )
+        ));
+        $checks = $ff->fetchAll();
+        // \f\pa($checks, 2, null, '$checks');
+
+        return $checks;
+    }
+
+    /**
+     * загружаем чеки с сервера, сравниваем с чеками на сайте и добавляем чего не хватает
+     * @param type $array_on_server
+     * @param type $checks
+     */
+    public static function getIikoIdFromJobman($db, int $user_id, $module_jobman = '070.jobman') {
+
+        $ff = $db->prepare('SELECT 
+                    mi.id, 
+                    mid.value iiko_id
+                FROM 
+                    mitems mi
+                    
+                INNER JOIN `mitems-dops` mid ON mid.id_item = mi.id AND mid.name = \'iiko_id\'
+
+                WHERE
+
+                    mi.module = :mod_jobman AND
+                    mi.status = \'show\' AND
+                    mi.id = :id_user
+                ;');
+
+        $ff->execute(array(
+            ':id_user' => $user_id,
+            ':mod_jobman' => $module_jobman,
+                //':date' => ' date(\'' . date('Y-m-d', $_SERVER['REQUEST_TIME'] - 3600*24*100 ) .'\') ',
+                // ':dates' => $start_date //date( 'Y-m-d', ($_SERVER['REQUEST_TIME'] - 3600 * 24 * 14 ) )
+        ));
+        if ($user = $ff->fetch()) {
+            return $user['iiko_id'];
+        } else {
+            throw new \Exception('не найден id в iiko для пользователя ' . $user_id);
+        }
+    }
+
+    /**
+     * получаем чеки 1 работника с даты по дату
+     * @param type $db
+     * @param int $user_id
+     * @param string $date_start
+     * @param string $date_fin
+     * @param type $mod_checks
+     * @return type
+     */
+    public static function getChecksJobman($db, int $user_id, string $date_start, string $date_fin, $mod_checks = '050.chekin_checkout') {
+
+        // начинаем сравнивать что есть чего нет
+        \Nyos\mod\items::$sql_itemsdop_add_where_array = array(
+            ':man' => $user_id
+            ,
+            ':datestart' => date('Y-m-d 00:00:00', strtotime($date_start))
+            ,
+            ':datefin' => date('Y-m-d 23:59:00', strtotime($date_fin))
+        );
+        $checki = \Nyos\mod\items::$sql_itemsdop2_add_where = '
+            INNER JOIN `mitems-dops` m1 ON m1.id_item = mi.id AND m1.name = \'jobman\' AND m1.value = :man
+            INNER JOIN `mitems-dops` m2 ON m2.id_item = mi.id AND m2.name = \'start\' AND m2.value_datetime >= :datestart
+            INNER JOIN `mitems-dops` m3 ON m3.id_item = mi.id AND m3.name = \'start\' AND m3.value_datetime <= :datefin
+            ';
+        $checki = \Nyos\mod\items::getItemsSimple($db, $mod_checks, 'show');
+        // \f\pa($checki, 2, '', '$checki');
+
+        return $checki['data'];
+    }
+
+    /**
+     * загружаем чеки с сервера, сравниваем с чеками на сайте и добавляем чего не хватает
+     * @param type $array_on_server
+     * @param type $checks
+     */
+    public static function importChecks($db, int $user_id, $what_day_to_diff = 3, $folder = '', $module_jobman = '070.jobman', $module_checks = '050.chekin_checkout') {
+
+        // $day_checked = 5;
+        //$user_id = $_GET['user'];
+//        if (empty($folder))
+//            $folder = \Nyos\Nyos::$folder_now;
+
+        $for_end = '';
 
         try {
 
-            echo '</br><h3>'.__FUNCTION__.' '.__FILE__.' #'.__LINE__.'</h3>';
-            
-            if (isset($_REQUEST['clear'])) {
+            $date_load = date('Y-m-d', ($_SERVER['REQUEST_TIME'] - 3600 * 24 * $what_day_to_diff));
+            $for_end .= '<br/>старт загрузки данных ' . $date_load;
 
-                \Nyos\mod\items::deleteFromDops($db, self::$mod_cats);
-                \Nyos\mod\items::deleteFromDops($db, self::$mod_items);
+            $ff = $db->prepare('SELECT 
+                    mi.id, 
+                    mid.value iiko_id
+                FROM 
+                    mitems mi
+                    
+                INNER JOIN `mitems-dops` mid ON mid.id_item = mi.id AND mid.name = \'iiko_id\'
 
-            } else {
+                WHERE
 
-                \f\timer_start(223);
+                    mi.module = :mod_jobman AND
+                    mi.status = \'show\' AND
+                    mi.id = :id_user
+                ;');
 
-                $res = self::scanNewDataFile($db, $folder);
-                \f\pa($res, 2, '', 'res self::scanNewDataFile');
+            $ff->execute(array(
+                ':id_user' => $user_id,
+                ':mod_jobman' => $module_jobman,
+                    //':date' => ' date(\'' . date('Y-m-d', $_SERVER['REQUEST_TIME'] - 3600*24*100 ) .'\') ',
+                    // ':dates' => $start_date //date( 'Y-m-d', ($_SERVER['REQUEST_TIME'] - 3600 * 24 * 14 ) )
+            ));
+            $user = $ff->fetch();
+            \f\pa($user, 2, null, 'user');
 
-                if (isset($_REQUEST['show']))
-                    echo '<br/>step 1 : ' . \f\timer_stop(223);
+            /**
+             * получаем инфу с сервера о чеках
+             */
+            $checks_on_server = \Nyos\api\Iiko::loadData('checki_day', $user['iiko_id'], $date_load);
+            //\f\pa($checks_on_server, 2, null, '$checks_on_server');
 
-                /**
-                 * если не пустой массив с каталогами, то сравниваем и добавляем
-                 */
-                if (isset($_REQUEST['show']))
-                    echo '<br/>#' . __LINE__ . ' + cat';
+            $checks = self::getChecksJobmanLastDays($db, $user['id'], 3);
+            // \f\pa($checks, 2, null, '$checks');
 
-                if (isset($_REQUEST['show']))
-                    echo '<div style="border: 1px solid red; padding: 15px; margin: 15px;" >';
+            /**
+             * сформировали массивы и сравниваем
+             */
+            foreach ($checks_on_server as $k => $v) {
 
-                \f\timer_start(2);
+                // echo '<Br/>'.$v['start'].' +++';
 
-                // добавляем каталоги
-                if (1 == 1) {
+                $searched = false;
 
-                    // \f\pa($cats_in, 2);
-                    $cats_now = \Nyos\mod\items::get($db, self::$mod_cats);
+                foreach ($checks as $k1 => $v1) {
 
-                    if (isset($_REQUEST['show']))
-                        \f\pa($cats_now, 2, '', 'cats now');
+                    /**
+                     * если старты одинаковые есть и там и там
+                     */
+                    //echo '<Br/>'.$v['start'].' - '.$v1['start'];
+                    if ($v['start'] == $v1['start']) {
 
-                    $different = self::differentArray($cats_now, $res['data']['cats']);
-                    if (isset($_REQUEST['show']))
-                        \f\pa($different, 2, '', '$different cat');
+                        $searched = true;
+                        $for_end .= '<br/>' . __LINE__ . ' нашли имеющийся чек старты равны ' . $v1['start'];
 
-                    $link_cat = [];
-                    foreach ($cats_now as $cat) {
-                        if (!isset($link_cat[$cat['a_id']]))
-                            $link_cat[$cat['a_id']] = $cat['id'];
-                    }
 
-                    if (isset($_REQUEST['show']))
-                        \f\pa($link_cat, 2, '', '$link_cat');
+                        // echo '<Br/>найдено!';
+                        // $searched = $v1;
+                        // если нет конца смены но есть начало
+                        if ($v['end'] != $v1['fin']) {
+                            $for_end .= '<br/>' . __LINE__ . ' концы смен не сходятся ';
 
-                    $new_cats = [];
-                    foreach ($different['new'] as $c) {
-                        if (isset($c['a_parentId'])) {
-                            if (isset($link_cat[$c['a_parentId']])) {
-                                $c['up_id'] = $link_cat[$c['a_parentId']];
-                                $new_cats[] = $c;
-                            }
+                            // \f\pa($v);
+                            // \f\pa($v1);
+
+                            $rows = [];
+
+                            $for_end .= '<br/>нет конца смены но есть начало';
+                            $for_end .= '<br/>пишем [' . $v['end'] . '] [' . $v1['fin'] . '] ';
+
+                            $rows[] = array(
+                                'name' => 'fin',
+                                'value_datetime' => $v['end'],
+                            );
+
+                            $smena_hours = ceil(( ( ceil(strtotime($v['end']) / 1800) * 1800 ) - ( ceil(strtotime($v['start']) / 1800) * 1800 ) ) / 1800) / 2;
+
+                            $rows[] = array(
+                                'name' => 'hour_on_job_calc',
+                                'value' => $smena_hours,
+                            );
+
+                            \f\pa($rows, 2, null, '$rows');
+                            \f\db\sql_insert_mnogo($db, 'mitems-dops', $rows, array('id_item' => $v1['id']));
                         } else {
-                            $new_cats[] = $c;
+                            $for_end .= '<br/>' . __LINE__ . ' концы смен сходятся, полностью одинаковые чеки - конец смены ' . $v1['fin'];
                         }
-                    }
 
-                    if (isset($_REQUEST['show']))
-                        \f\pa($new_cats, 2, '', '$new_cats');
-
-                    \Nyos\mod\items::addNewSimples($db, self::$mod_cats, $new_cats);
-
-                    unset($new_cats, $cats_now);
-                }
-
-                if (isset($_REQUEST['show']))
-                    echo '<br/>timer : ' . \f\timer_stop(2);
-
-                // return [ 'cats' => $cats_now, 'diff' => $different ];
-                // \f\pa($res2, 2, '', 'res self::differentCats');
-
-                if (isset($_REQUEST['show']))
-                    echo '</div>';
-
-                echo '<br/>добавляем итемы';
-
-                $items_old = \Nyos\mod\items::get_older($db, self::$mod_items);
-                \f\pa($items_old, 2, '', '$items_old');
-
-                //\f\pa($res['data']['items'], 2, '', '$res[data][items]');
-
-                $diff_items = self::differentArray($items_old, $res['data']['items']);
-                \f\pa($diff_items, 2, '', '$diff_items');
-
-
-                \f\pa($link_cat, 2, '', '$link_cat');
-
-
-                $nn = 0;
-                $in_db = [];
-                foreach ($diff_items['new'] as $item) {
-
-                    if (!empty($item['a_categoryId'])) {
-
-                        if (!empty($link_cat[$item['a_categoryId']])) {
-
-                            if ($nn >= 300)
-                                break;
-
-                            $nn++;
-                            $item['cat_id'] = $link_cat[$item['a_categoryId']];
-
-                            if (!empty($item['a_catNumber']))
-                                $item['catNumber_search'] = \f\translit($item['a_catNumber'], 'cifru_bukvu');
-
-                            $in_db[] = $item;
-                        }
+//                        \f\pa($v);
+//                        \f\pa($v1);
+                        // break;
                     }
                 }
 
-                \Nyos\mod\items::addNewSimples($db, self::$mod_items, $in_db);
-                echo '<br/>#' . __LINE__ . ' добавлено товаров ' . sizeof($in_db);
+                if ($searched === false) {
 
-                // \f\pa($re, 2, '', '$re');
+                    $for_end .= '<br/>' . __LINE__ . ' не нашли чек с сервера <br/> старт ' . $v['start'] . ' - ' . $v['end'];
+
+                    // \f\pa($v);
+                    // \f\pa($v1);
+
+                    $indb = array(
+                        'jobman' => $user['id'],
+                        'start' => date('Y-m-d H:i:00', strtotime($v['start'])),
+                        'who_add_item' => 'iiko'
+                    );
+
+                    if (!empty($v['end'])) {
+                        $indb['fin'] = date('Y-m-d H:i:00', strtotime($v['end']));
+                        $indb['hour_on_job_calc'] = self::calculateHoursInRange($v['start'], $v['end']);
+                    }
+
+                    \Nyos\mod\items::addNew($db, $folder, \Nyos\Nyos::$menu['050.chekin_checkout'], $indb);
+                    $for_end .= '<br/>' . __LINE__ . ' добавили чек ';
+                }
             }
 
-            return \f\end3($html, true, ['new_item' => sizeof($indb)]);
-        } catch (\Exception $exc) {
+            return \f\end2('обработка прошла успешно ', true, array('txt' => $for_end), 'array');
+        } catch (\PDOException $ex) {
+            $msg = '<pre>--- ' . __FILE__ . ' ' . __LINE__ . '-------'
+                    . PHP_EOL . $ex->getMessage() . ' #' . $ex->getCode()
+                    . PHP_EOL . $ex->getFile() . ' #' . $ex->getLine()
+                    . PHP_EOL . $ex->getTraceAsString()
+                    . '</pre>';
 
-            // echo $exc->getTraceAsString();
-            \f\pa($exc);
-            return \f\end3('ошибка ' . $exc->getMessage(), true, $exc);
-            
-        } finally{
-            
-            die('#'.__LINE__);
-            
+            return \f\end2('какая то ошибка', false, array('txt' => $for_end, 'error' => $msg), 'array');
         }
-
-
-//            $nn = 0;
-//
-//            $new_item = [];
-//            foreach ($res3['new'] as $item) {
-//                if (isset($link_cat[$item['a_categoryId']])) {
-//                    if ($nn > 500)
-//                        break;
-//                    $item['cat_id'] = $link_cat[$item['a_categoryId']];
-//                    $new_item[] = $item;
-//                    $nn++;
-//                }
-//            }
-//
-//            \f\pa($new_item, 2, '', '$new_item');
-//
-//            echo '<br/>step 3 : ' . \f\timer_stop(223);
-//
-//            \Nyos\mod\items::addNewSimples($db, self::$mod_items, $new_item);
-//
-//            echo '<br/>step 4 add : ' . \f\timer_stop(223);
-        // $link_cat
-//            $new_i = [];
-//        foreach( $res3['new'] as $item ){
-//            $item['a_categoryId'] = 
-//            $new_i
-//        }
-        // }
-        // \Nyos\mod\items::addNewSimples($db, self::$mod_cats, $cats_in);
-
-        return true;
-
-
-
-        // echo \f\timer_stop(334);
-        //   exit;
-        // 
-        // \f\pa($cats,2);
-//        echo '<br/>#' . __LINE__;
-//        return \f\end3('+ папки');
-
-        if (isset($est_xml_file) && $est_xml_file === true) {
-
-            if (3 == 4)
-                rename($sc . $file, $sc . $file . '.' . date('Y-m-d_h-i-s') . '.old.xml');
-
-            // \f\pa($cats, 2);
-
-            /**
-             * записываем каталоги которых нет в базе
-             */
-            $ww = \Nyos\mod\items::deleteFromDops($db, $mod_cats);
-
-            $cats_now = \Nyos\mod\items::get($db, $mod_cats);
-
-            $new_cats = self::differentCats($cats_now, $cats);
-            \f\pa($new_cats, '', '', 'new_cats');
-
-            // exit;
-            // \Nyos\mod\items::addNewSimples($db, $mod_cats, $new_cats['new']);
-
-
-
-            exit;
-
-
-
-//        \Nyos\mod\items::saveNewDop($db, $new_cats['edit'] );
-            // \f\pa($cats, 2);
-            // $we = \Nyos\mod\items::get($db, $mod_cats);
-            // \f\pa($we, 2, '', 'we');
-
-            $ww = \Nyos\mod\items::deleteFromDops($db, $mod_items);
-
-            $items_now = \Nyos\mod\items::get($db, $mod_items);
-            $new_items = self::differentItems($items_now, $items);
-            // \f\pa($new_items, '', '', 'new_items');
-
-            $ar_cat_catid_dbid = [];
-            $cats2 = \Nyos\mod\items::get($db, $mod_cats);
-            // \f\pa($cats2);
-            foreach ($cats2 as $k => $v) {
-                $ar_cat_catid_dbid[$v['a_id']] = $v['id'];
-            }
-
-            unset($cats2);
-
-            $items2 = [];
-
-            foreach ($new_items['new'] as $k => $v) {
-
-                if (isset($ar_cat_catid_dbid[$v['a_categoryId']]))
-                    $v['cat_id'] = $ar_cat_catid_dbid[$v['a_categoryId']];
-
-                $items2[] = $v;
-            }
-
-            unset($ar_cat_catid_dbid, $new_items['new']);
-
-            \Nyos\mod\items::addNewSimples($db, $mod_items, $items2);
-
-//        \Nyos\mod\items::saveNewDop($db, $new_items['edit'] );
-
-            if (1 == 2) {
-
-                $ar_catId_normId = [];
-
-                foreach ($we as $k => $v) {
-
-                    $ar_catId_normId[$v['a_id']] = $v['id'];
-                }
-
-                //\f\pa($ar_catId_normId);
-                //exit;
-                // echo '<br/>#'.__LINE__;
-//        $nn = 1;
-//
-//        foreach ($we as $k => $v) {
-//
-//            if ($nn > 2)
-//                break;
-//
-//            \f\pa($v);
-//            $nn++;
-//        }
-
-                $now_items0 = \Nyos\mod\items::get($db, $mod_items);
-                $now_items = [];
-                foreach ($now_items0 as $k1 => $v1) {
-                    $now_items[$v1['a_id']] = $v1;
-                }
-                unset($now_items0);
-                // \f\pa($items);
-
-                $items1 = [];
-
-                foreach ($items as $k => $v) {
-
-                    /**
-                     * сравнение данных +
-                     */
-                    // если есть уже такой id товара то не добавляем
-                    if (isset($now_items[$v['a_id']]))
-                        continue;
-
-                    /**
-                     * сравнение данных -
-                     */
-                    if (!empty($v['a_categoryId']) && !empty($ar_catId_normId[$v['a_categoryId']]))
-                        $v['cat_id'] = $ar_catId_normId[$v['a_categoryId']];
-
-                    $items1[] = $v;
-                }
-
-                unset($items);
-                // \f\pa($items1);
-                // exit;
-                // \Nyos\mod\items::deleteFromDops($db, $mod_items);
-                \Nyos\mod\items::addNewSimples($db, $mod_items, $items1);
-                // \f\pa($items, 2);
-
-                $we = \Nyos\mod\items::get($db, $mod_items);
-                // \f\pa($we, 2, '', 'we items');
-//        $nn = 1;
-//        foreach ($we as $k => $v) {
-//
-//            if ($nn > 2)
-//                break;
-//
-//            \f\pa($v);
-//
-//            $nn++;
-//        }
-            }
-
-            return \f\end3('файл обработали', true, [
-                'cats_new' => sizeof($new_cats),
-                'cats_in_xml' => sizeof($cats),
-                'cats_in_db' => sizeof($cats_now),
-//                'cats' => sort_cats($cats),
-//                'cats_all' => $cats,
-//                'items' => $items,
-                'items_colvo' => sizeof($items),
-//                '123' => 123
-            ]);
-            // break;
-        }
-
-        // echo '<br/>'.\f\timer_stop(334);
-        // exit;
-
-        return \f\end3('нет файла данных', false);
     }
 
     /**
-     * сканим новый файл данных
+     * ложим отметки о чеках в нашу базу
      * @param type $db
-     * @return json
+     * @param type $user
+     * @param type $array_checks
      */
-    public static function scanNewDataFile($db, $folder) {
+    public static function putNewChecks($db, $user, $array_checks, $folder = null) {
 
-        echo '<br/>#' . __LINE__ . ' scanNewDaFile';
+        if ($folder === null)
+            $folder = \Nyos\Nyos::$folder_now;
 
-        \f\timer_start(789);
+        foreach ($array_checks as $k => $v) {
 
-        $sc = DR . dir_site_sd . (!empty($folder) ? $folder . '/' : '' );
+            $inin = array(
+                'start' => !empty($v['start']) ? date('Y-m-d H:i', strtotime($v['start'])) : '',
+                'fin' => !empty($v['end']) ? date('Y-m-d H:i', strtotime($v['end'])) : '',
+                'jobman' => $user
+            );
 
-        if (!is_dir($sc))
-            throw new Exception('нет папки', 1);
+            if (!empty($v['end']) && !empty($v['start']))
+                $inin['hour_on_job_calc'] = ceil(( ( ceil(strtotime($v['end']) / 1800) * 1800 ) - ( ceil(strtotime($v['start']) / 1800) * 1800 ) ) / 1800) / 2;
 
-        $cats = $items = [];
+            // \f\pa($inin);
 
-        // сканим папку с файлами и ищем новый
-        if (1 == 1) {
-
-            $sc_scan = scandir($sc);
-
-            foreach ($sc_scan as $k => $file) {
-
-                if (strpos($file, '.old.') !== false)
-                    continue;
-
-                if (strpos($file, '.xml') !== false) {
-
-//                    \f\pa($sc . $file);
-//                    continue;
-
-                    $est_xml_file = true;
-
-                    // echo '<br/>#' . __LINE__ . ' ' . $sc . $file;
-
-                    $reader = new \XMLReader();
-
-                    if (!$reader->open($sc . $file))
-                        return \f\end3('Failed to open ' . $sc . $file, false);
-
-                    $d = ['id' => 0, 'parentId' => 0, 'name' => 'head'];
-                    $d_item = ['id' => 0, 'categoryId' => 0, 'price' => 0, 'in_stock' => 0];
-
-                    $cats = [];
-                    $items = [];
-
-                    while ($reader->read()) {
-
-                        if ($reader->nodeType == \XMLReader::ELEMENT && $reader->name == 'category') {
-
-                            $d1 = [];
-                            $node = (array) new \SimpleXMLElement($reader->readOuterXML());
-
-                            if (!empty($node['@attributes']))
-                                foreach ($node['@attributes'] as $k1 => $v1) {
-                                    if (!empty($v1)) {
-                                        if ($k1 == 'name') {
-                                            $d1['head'] = $v1;
-                                            // echo '<br/>'.$v1;
-                                        } else {
-                                            $d1['a_' . $k1] = $v1;
-                                        }
-                                    }
-                                }
-                            $cats[] = $d1;
-                        }
-                        //
-                        elseif ($reader->nodeType == \XMLReader::ELEMENT && $reader->name == 'item') {
-
-                            $d1 = [];
-
-                            $node = (array) new \SimpleXMLElement($reader->readOuterXML());
-
-                            if (!empty($node['name'])) {
-                                $d1['head'] = $node['name'];
-
-                                if (!empty($node['@attributes']))
-                                    foreach ($node['@attributes'] as $k1 => $v1) {
-                                        if (!empty($v1))
-                                            $d1['a_' . $k1] = $v1;
-                                    }
-                            }
-
-                            $items[] = $d1;
-                        }
-                    }
-
-                    // echo '<br/>#' . __LINE__;
-
-                    $reader->close();
-                    break;
-                }
-            }
-
-//            \f\pa([
-//                'cats' => $cats,
-//                    // 'items' => $items 
-//                    ], 2, '', 'cat items 0');
-//            \f\pa([
-//                // 'cats' => $cats, 
-//                'items' => $items
-//                    ], 2, '', 'item items' 0);
+            $tt = \Nyos\mod\items::addNew($db, $folder, \Nyos\nyos::$menu['050.chekin_checkout'], $inin);
         }
+    }
 
-        return \f\end3('обработ', true,
-                [
-                    'cats' => $cats ?? [],
-                    'items' => $items ?? [],
-                    'time' => \f\timer_stop(789)
-                ]
+    /**
+     * просмотр списка загрузок
+     * @param type $db
+     * @return type
+     */
+    public static function getListLog($db) {
+        $ff = $db->prepare('SELECT 
+                    mi.id, '
+                . ' mi.head, '
+                . ' mid2.value_date last_import '
+                . '
+
+                FROM 
+
+                    mitems mi
+
+                INNER JOIN `mitems-dops` mid ON mid.id_item = mi.id AND mid.name = \'iiko_id\'
+
+                INNER JOIN `mitems` mi2 ON mi2.status = \'show\' AND mi2.module = \'081.job_checks_from_iiko\' ' .
+                ' INNER JOIN `mitems-dops` mid3 ON mid3.id_item = mi2.id AND mid3.name = \'jobman\' AND mid3.value = mi.id ' .
+                ' LEFT JOIN `mitems-dops` mid2 ON mid2.id_item = mi2.id AND mid2.name = \'data\' ' . // 'AND mid2.value < :date '.
+
+                '
+
+                WHERE
+
+                    mi.module = :mod1 AND
+                    mi.status = \'show\' 
+                GROUP BY 
+                    mi.id
+
+                ORDER BY '
+                . ' mid2.value ASC '
+                // . ' LIMIT 10 '
         );
-    }
 
-    /**
-     * сравниваем 2 массива каталогов и выводим новые и отредактированные данные
-     * @param type $ar_now
-     * @param type $ar_in
-     * @return type
-     */
-    public static function differentCats($db, $cats_in) {
-
-        // \f\pa($cats_in, 2);
-        $cats_now = \Nyos\mod\items::get($db, self::$mod_cats);
-        // \f\pa($cats_now, 2,'','cats now');
-        $different = self::differentArray($cats_now, $cats_in);
-
-        return ['cats' => $cats_now, 'diff' => $different];
-
-
-
-        // \Nyos\mod\items::addNewSimples($db, self::$mod_cats, );
-        // \Nyos\mod\items::addNewSimples($db, self::$mod_cats, $cats_in);
-
-
-        $cats2 = [];
-        foreach ($cats_now as $v) {
-            $cats2[$v['a_id']] = $v;
-        }
-        // unset($cats_now);
-
-        echo '<br/>#' . __LINE__;
-
-        $cats = [];
-        foreach ($cats_in as $v) {
-
-//            if( in_array( [ 'a_id' => $v['a_id'] ], $cats_now ) ){
-//                echo '<br/>#'.__LINE__;
-//            }
-
-            if (!isset($cats2[$v['a_id']]))
-                echo '<br/>#' . __LINE__;
-
-            // $cats[$v['a_id']] = $v;
-        }
-        unset($cats_in);
-
-
-        return;
-
-
-
-
-
-
-
-        // \f\pa($ar_in, 2, '', 'ar_in');
-        // \f\pa($ar_now, 2, '', 'ar_now');
-        // exit;
-
-        $now = [];
-        foreach ($ar_now as $k => $v) {
-            $now[$v['a_id']] = $v;
-        }
-
-        // unset($ar_now);
-        // \f\pa($items);
-
-        $return = [
-            'new' => []
-            , 'edit' => []
-        ];
-
-        foreach ($ar_in as $k => $v) {
-
-            /**
-             * сравнение данных +
-             */
-            // если есть уже такой id товара то не добавляем
-            if (isset($now[$v['a_id']])) {
-
-//                \f\pa($now[$v['a_id']]);
-//                \f\pa($v);
-//                echo '<hr>';
-
-                continue;
-            }
-
-            /**
-             * сравнение данных -
-             */
-//            if ( !empty($now[$v['a_id']]) )
-//                $v['cat_id'] = $now[$v['a_id']];
-
-            $return['new'][] = $v;
-        }
-
-        return $return;
-    }
-
-    public static function differentArray($old = [], $new = []) {
-
-//function compare_by_area($a, $b) {
-//    $areaA = $a->width * $a->height;
-//    $areaB = $b->width * $b->height;
-//    
-//    if ($areaA < $areaB) {
-//        return -1;
-//    } elseif ($areaA > $areaB) {
-//        return 1;
-//    } else {
-//        return 0;
-//    }
-//}
-//
-//print_r(array_udiff($array1, $array2, 'compare_by_area'));        
-
-        $return = ['new' => [], 'edit' => []];
-
-        $old2 = [];
-        if (!empty($old))
-            foreach ($old as $v) {
-                $old2[$v['a_id']] = 1;
-            }
-
-//        $nn = 0;
-
-        if (!empty($new))
-            foreach ($new as $v) {
-
-//                if ($nn >= 300)
-//                    break;
-//                $nn++;
-
-                if (!isset($old2[$v['a_id']])) {
-                    $return['new'][] = $v;
-                }
-            }
-
-        return $return;
-    }
-
-    public static function differentItems($db, $items_in) {
-
-        // \Nyos\mod\items::addNewSimples($db, self::$mod_cats, );
-        // \f\pa($items_in, 2, '',' $items_in ');
-        // \Nyos\mod\items::addNewSimples($db, self::$mod_cats, $cats_in);
-
-        $items_old = \Nyos\mod\items::get($db, self::$mod_items);
-        // \f\pa($cats_now, 2);
-//        \f\pa($items_old, 2, '', '$items_old');
-//        \f\pa($items_in, 2, '', '$items_in');
-
-        $different = self::differentArray($items_old, $items_in);
-
-//        echo '<div style="border:1px solid gray" >';
-//        \f\pa($different, 2, '', '$different');
-//        echo '</div>';
-
-        return $different;
-
-        $cats2 = [];
-        foreach ($cats_now as $v) {
-            $cats2[$v['a_id']] = $v;
-        }
-        // unset($cats_now);
-
-        echo '<br/>#' . __LINE__;
-
-        $cats = [];
-        foreach ($cats_in as $v) {
-
-//            if( in_array( [ 'a_id' => $v['a_id'] ], $cats_now ) ){
-//                echo '<br/>#'.__LINE__;
-//            }
-
-            if (!isset($cats2[$v['a_id']]))
-                echo '<br/>#' . __LINE__;
-
-            // $cats[$v['a_id']] = $v;
-        }
-        unset($cats_in);
-
-
-
-
-
-
-        return;
-
-
-
-
-
-
-
-        // \f\pa($ar_in, 2, '', 'ar_in');
-        // \f\pa($ar_now, 2, '', 'ar_now');
-        // exit;
-
-        $now = [];
-        foreach ($ar_now as $k => $v) {
-            $now[$v['a_id']] = $v;
-        }
-
-        // unset($ar_now);
-        // \f\pa($items);
-
-        $return = [
-            'new' => []
-            , 'edit' => []
-        ];
-
-        foreach ($ar_in as $k => $v) {
-
-            /**
-             * сравнение данных +
-             */
-            // если есть уже такой id товара то не добавляем
-            if (isset($now[$v['a_id']])) {
-
-//                \f\pa($now[$v['a_id']]);
-//                \f\pa($v);
-//                echo '<hr>';
-
-                continue;
-            }
-
-            /**
-             * сравнение данных -
-             */
-//            if ( !empty($now[$v['a_id']]) )
-//                $v['cat_id'] = $now[$v['a_id']];
-
-            $return['new'][] = $v;
-        }
-
-        return $return;
-    }
-
-    /**
-     * сравниваем 2 массива каталогов и выводим новые и отредактированные данные
-     * @param type $ar_now
-     * @param type $ar_in
-     * @return type
-     */
-    public static function differentItems_old($ar_now, $ar_in) {
-
-        // \f\pa($ar_in, 2, '', 'ar_in');
-        // \f\pa($ar_now, 2, '', 'ar_now');
-        // exit;
-
-        $now = [];
-        foreach ($ar_now as $k => $v) {
-            $now[$v['a_id']] = $v;
-        }
-
-        // unset($ar_now);
-        // \f\pa($items);
-
-        $return = [
-            'new' => []
-            , 'edit' => []
-        ];
-
-        foreach ($ar_in as $k => $v) {
-
-            /**
-             * сравнение данных +
-             */
-            // если есть уже такой id товара то не добавляем
-            if (isset($now[$v['a_id']])) {
-
-//                \f\pa($now[$v['a_id']]);
-//                \f\pa($v);
-//                echo '<hr>';
-
-                continue;
-            }
-
-            /**
-             * сравнение данных -
-             */
-//            if ( !empty($now[$v['a_id']]) )
-//                $v['cat_id'] = $now[$v['a_id']];
-
-            $return['new'][] = $v;
-        }
-
-        return $return;
+        $ff->execute(array(
+            // ':id_user' => 'f34d6d84-5ecb-4a40-9b03-71d03cb730cb',
+            ':mod1' => '070.jobman',
+                //':date' => ' date(\'' . date('Y-m-d', $_SERVER['REQUEST_TIME'] - 3600*24*100 ) .'\') ',
+                // ':dates' => $start_date //date( 'Y-m-d', ($_SERVER['REQUEST_TIME'] - 3600 * 24 * 14 ) )
+        ));
+        //$e3 = $ff->fetchAll();
+
+        $e = $ff->fetchAll();
+        //\f\pa($e);
+
+        return $e;
     }
 
 }

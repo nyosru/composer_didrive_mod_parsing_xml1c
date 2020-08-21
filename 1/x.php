@@ -1,11 +1,5 @@
 <?php
 
-/**
-запуск после обработки модуля
-**/
-
-// echo '</br>'.__FILE__.' #'.__LINE__;
-
 /*
 // файл для кеширования страниц со списком новостей (начиная с 6 версии)
 $FiCash = DirSite.DS.'_cash.'.( isset($a_menu[level]['type']) ? $a_menu[level]['type'] : '' ).'.'.( isset($a_menu[level]['version']) ? $a_menu[level]['version'] : '' ).'_'.
