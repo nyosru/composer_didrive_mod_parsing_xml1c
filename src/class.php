@@ -366,12 +366,7 @@ class parsing_xml1c {
      */
     public static function scanNewDataFile($db, $folder) {
 
-        // echo '<br/>#' . __LINE__ . ' scanNewDaFile';
-
-        //\f\timer_start(789);
-
         $sc = DR . DS . 'sites' . DS . (!empty($folder) ? $folder . '/' : '' ) . 'download' . DS . '1c.dump' . DS;
-        // \f\pa($sc);
 
         if (!is_dir($sc))
             throw new \Exception('нет папки ' . $sc, 1);
@@ -389,29 +384,19 @@ class parsing_xml1c {
             
             foreach ($sc_scan as $k => $file) {
 
-                // echo '<br/>' . $file;
-
                 if (strpos($file, '.old.') !== false)
                     continue;
 
                 if (strpos($file, '.xml') !== false) {
 
                     $start1 = true;
-                    // echo '<br/>' . __FILE__;
-
                     $data_file = $file;
-
-                    \f\pa($sc . $file);
-//                    continue;
-
                     $est_xml_file = true;
-
-                    // echo '<br/>#' . __LINE__ . ' ' . $sc . $file;
-
+                    
                     $reader = new \XMLReader();
 
-                    if (!$reader->open($sc . $file))
-                        return \f\end3('Failed to open ' . $sc . $file, false);
+                    if ( !$reader->open($sc . $file) )
+                        throw new \Exception('Failed to open ' . $sc . $file );
 
                     $d = ['id' => 0, 'parentId' => 0, 'name' => 'head'];
                     $d_item = ['id' => 0, 'categoryId' => 0, 'price' => 0, 'in_stock' => 0];
@@ -465,7 +450,7 @@ class parsing_xml1c {
 
                     $reader->close();
                     
-                    rename( $sc.$file , $sc.$file.'.old.xml' );
+                    rename( $sc.$file , $sc.$file.'.old.'.date('Ymd.his').'.xml' );
                     
                     break;
                 }

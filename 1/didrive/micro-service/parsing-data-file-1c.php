@@ -8,7 +8,6 @@ if (strpos($_SERVER['HTTP_HOST'], 'dev.') !== false) {
     ini_set('display_startup_errors', 1);
 }
 
-
 try {
 
 //    if (empty($_REQUEST['date']))
@@ -34,103 +33,44 @@ try {
 
     try {
 
-//f\pa($now);
-// \f\pa($now, 2);
-// $amnu = \Nyos\nyos::get_menu($now['folder']);
-
         \Nyos\nyos::getMenu();
-// $amnu = \Nyos\nyos::$menu;
-//        if (empty(\Nyos\nyos::$menu))
-//            throw new \Exception('пустое меню');
-//
-//        \f\pa( \Nyos\nyos::$menu, 2);
-//            $dir = $_SERVER['DOCUMENT_ROOT'] . DS . 'sites' . DS . \Nyos\Nyos::$folder_now . DS . 'download' . DS .'1c.dump' . DS ;
-//            
-//            $list = scandir($dir);
-//            \f\pa($list);
-//            
-//            foreach( $list as $v ){
-//                
-//                if( $v == 'AllCatalog.xml' ){
-//        \f\pa(\Nyos\Nyos::$folder_now);
 
-//        try {
+        $res = Nyos\mod\parsing_xml1c::scanNewDataFile($db, \Nyos\Nyos::$folder_now);
+        // \f\pa($res, 2);
 
-            $res = Nyos\mod\parsing_xml1c::scanNewDataFile($db, \Nyos\Nyos::$folder_now);
-            // \f\pa($res, 2);
+        if (!empty($res['data']['cats'])) {
 
-            if (!empty($res['data']['cats'])) {
+            $sql = 'TRUNCATE `mod_020_cats` ;';
+            $s2 = $db->prepare($sql);
+            $s2->execute();
 
-                $sql = 'TRUNCATE `mod_020_cats` ;';
-                $s2 = $db->prepare($sql);
-                $s2->execute();
-
-                $res_in = \Nyos\mod\items::adds($db, '020.cats', $res['data']['cats']);
-                // \f\pa($res_in, 2, '', '$res_in');
-            }
-
-            if (!empty($res['data']['items'])) {
-
-                $sql = 'TRUNCATE `mod_021_items` ;';
-                $s2 = $db->prepare($sql);
-                $s2->execute();
-
-                $res_in = \Nyos\mod\items::adds($db, '021.items', $res['data']['items']);
-                // \f\pa($res_in, 2, '', '$res_in');
-            }
-            
-//        } catch (\Exception $ex) {
-//
-//            \f\pa($ex);
-//        }
-
-
-
-
-//                            PageData::parseFile(
-//                                $_SERVER['DOCUMENT_ROOT'] . DS . '9.site' . DS . $now['folder'] . DS . 'download' . DS . 'datain' . DS . $v1['datain_name_file'], $now['folder'], $v1['cfg.level'], ( isset($v1['type_file_data']) ? $v1['type_file_data'] : null)
-//                        );
-//                    
-//                }
-//                
-//            }
-//            
-//                    
-//                        require_once './../class.php';
-//
-//                        Nyos\mod\PageData::parseFile(
-//                                $_SERVER['DOCUMENT_ROOT'] . DS . '9.site' . DS . $now['folder'] . DS . 'download' . DS . 'datain' . DS . $v1['datain_name_file'], $now['folder'], $v1['cfg.level'], ( isset($v1['type_file_data']) ? $v1['type_file_data'] : null)
-//                        );
-//
-//                        echo '<br/>обработка файла данных прошла успешно';
-//                    } else {
-//                        echo '<br/>файл данных не обнаружен';
-//                    }
-//                }
-//            }
-//        }
-
-        if (isset($get['action']) && $get['action'] == 'scan_new_file') {
-            
-        } else {
-            $msg = 'Обработано каталогов:' . sizeof($res['data']['cats']) . ' '
-                    . ' товаров: ' . sizeof($res['data']['items']);
-
-            \nyos\Msg::sendTelegramm($msg, null, 2);
-
-            die($msg);
+            $res_in = \Nyos\mod\items::adds($db, '020.cats', $res['data']['cats']);
+            // \f\pa($res_in, 2, '', '$res_in');
         }
+
+        if (!empty($res['data']['items'])) {
+
+            $sql = 'TRUNCATE `mod_021_items` ;';
+            $s2 = $db->prepare($sql);
+            $s2->execute();
+
+            $res_in = \Nyos\mod\items::adds($db, '021.items', $res['data']['items']);
+            // \f\pa($res_in, 2, '', '$res_in');
+        }
+
+        $msg = 'Обработано каталогов:' . sizeof($res['data']['cats']) . ' '
+                . ' товаров: ' . sizeof($res['data']['items']);
+
+        \nyos\Msg::sendTelegramm($msg, null, 2);
+
+        die($msg);
     } catch (\Exception $exc) {
 
 // echo $exc->getTraceAsString();
 
         \nyos\Msg::sendTelegramm('произошла ошибка ' . $exc->getMessage(), null, 2);
 
-        echo '<pre>';
-        print_r($_REQUEST);
-        echo PHP_EOL;
-        print_r($exc);
-        echo '</pre>';
+        // echo '<pre>';        print_r($_REQUEST);        echo PHP_EOL;        print_r($exc);        echo '</pre>';
     }
 
     die(__FILE__ . ' #' . __LINE__);
