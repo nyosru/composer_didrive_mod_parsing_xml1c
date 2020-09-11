@@ -34,13 +34,12 @@ class parsing_xml1c {
 
         try {
 
-            echo '</br><h3>'.__FUNCTION__.' '.__FILE__.' #'.__LINE__.'</h3>';
-            
+            echo '</br><h3>' . __FUNCTION__ . ' ' . __FILE__ . ' #' . __LINE__ . '</h3>';
+
             if (isset($_REQUEST['clear'])) {
 
                 \Nyos\mod\items::deleteFromDops($db, self::$mod_cats);
                 \Nyos\mod\items::deleteFromDops($db, self::$mod_items);
-
             } else {
 
                 \f\timer_start(223);
@@ -161,11 +160,9 @@ class parsing_xml1c {
             // echo $exc->getTraceAsString();
             \f\pa($exc);
             return \f\end3('ошибка ' . $exc->getMessage(), true, $exc);
-            
-        } finally{
-            
-            die('#'.__LINE__);
-            
+        } finally {
+
+            die('#' . __LINE__);
         }
 
 
@@ -371,14 +368,17 @@ class parsing_xml1c {
 
         echo '<br/>#' . __LINE__ . ' scanNewDaFile';
 
-        \f\timer_start(789);
+        //\f\timer_start(789);
 
-        $sc = DR . dir_site_sd . (!empty($folder) ? $folder . '/' : '' );
+        $sc = DR . DS . 'sites' . DS . (!empty($folder) ? $folder . '/' : '' ) . 'download' . DS . '1c.dump' . DS;
+        // \f\pa($sc);
 
         if (!is_dir($sc))
-            throw new Exception('нет папки', 1);
+            throw new \Exception('нет папки ' . $sc, 1);
 
         $cats = $items = [];
+
+        $data_file = '';
 
         // сканим папку с файлами и ищем новый
         if (1 == 1) {
@@ -387,12 +387,18 @@ class parsing_xml1c {
 
             foreach ($sc_scan as $k => $file) {
 
+                echo '<br/>' . $file;
+
                 if (strpos($file, '.old.') !== false)
                     continue;
 
                 if (strpos($file, '.xml') !== false) {
 
-//                    \f\pa($sc . $file);
+                    echo '<br/>' . __FILE__;
+
+                    $data_file = $file;
+
+                    \f\pa($sc . $file);
 //                    continue;
 
                     $est_xml_file = true;
@@ -424,7 +430,7 @@ class parsing_xml1c {
                                             $d1['head'] = $v1;
                                             // echo '<br/>'.$v1;
                                         } else {
-                                            $d1['a_' . $k1] = $v1;
+                                            $d1['a_' . strtolower($k1)] = $v1;
                                         }
                                     }
                                 }
@@ -442,8 +448,9 @@ class parsing_xml1c {
 
                                 if (!empty($node['@attributes']))
                                     foreach ($node['@attributes'] as $k1 => $v1) {
-                                        if (!empty($v1))
-                                            $d1['a_' . $k1] = $v1;
+
+                                        if (!empty($v1) && $v1 != '' )
+                                            $d1['a_' . strtolower($k1) ] = $v1;
                                     }
                             }
 
@@ -454,6 +461,9 @@ class parsing_xml1c {
                     // echo '<br/>#' . __LINE__;
 
                     $reader->close();
+                    
+                    rename( $sc.$file , $sc.$file.'.old.xml' );
+                    
                     break;
                 }
             }
@@ -470,6 +480,7 @@ class parsing_xml1c {
 
         return \f\end3('обработ', true,
                 [
+                    'file' => $data_file,
                     'cats' => $cats ?? [],
                     'items' => $items ?? [],
                     'time' => \f\timer_stop(789)
