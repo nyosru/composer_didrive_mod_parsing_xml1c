@@ -112,7 +112,12 @@ try {
         if (isset($get['action']) && $get['action'] == 'scan_new_file') {
             
         } else {
-            die('Спасибо');
+            $msg = 'Обработано каталогов:' . sizeof($res['data']['cats']) . ' '
+                    . ' товаров: ' . sizeof($res['data']['items']);
+
+            \nyos\Msg::sendTelegramm($msg, null, 2);
+
+            die($msg);
         }
     } catch (\Exception $exc) {
 
