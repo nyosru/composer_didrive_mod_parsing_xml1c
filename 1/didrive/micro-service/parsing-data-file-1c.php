@@ -54,7 +54,7 @@ try {
 //                if( $v == 'AllCatalog.xml' ){
 //        \f\pa(\Nyos\Nyos::$folder_now);
 
-        try {
+//        try {
 
             $res = Nyos\mod\parsing_xml1c::scanNewDataFile($db, \Nyos\Nyos::$folder_now);
             // \f\pa($res, 2);
@@ -78,10 +78,11 @@ try {
                 $res_in = \Nyos\mod\items::adds($db, '021.items', $res['data']['items']);
                 // \f\pa($res_in, 2, '', '$res_in');
             }
-        } catch (\Exception $ex) {
-
-            \f\pa($ex);
-        }
+            
+//        } catch (\Exception $ex) {
+//
+//            \f\pa($ex);
+//        }
 
 
 

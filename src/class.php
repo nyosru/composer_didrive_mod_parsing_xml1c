@@ -366,7 +366,7 @@ class parsing_xml1c {
      */
     public static function scanNewDataFile($db, $folder) {
 
-        echo '<br/>#' . __LINE__ . ' scanNewDaFile';
+        // echo '<br/>#' . __LINE__ . ' scanNewDaFile';
 
         //\f\timer_start(789);
 
@@ -385,16 +385,19 @@ class parsing_xml1c {
 
             $sc_scan = scandir($sc);
 
+            $start1 = false;
+            
             foreach ($sc_scan as $k => $file) {
 
-                echo '<br/>' . $file;
+                // echo '<br/>' . $file;
 
                 if (strpos($file, '.old.') !== false)
                     continue;
 
                 if (strpos($file, '.xml') !== false) {
 
-                    echo '<br/>' . __FILE__;
+                    $start1 = true;
+                    // echo '<br/>' . __FILE__;
 
                     $data_file = $file;
 
@@ -466,8 +469,12 @@ class parsing_xml1c {
                     
                     break;
                 }
+                
             }
 
+            if ( $start1 === false )
+                throw new \Exception('Не обнаружен файл для обработки' );
+            
 //            \f\pa([
 //                'cats' => $cats,
 //                    // 'items' => $items 
