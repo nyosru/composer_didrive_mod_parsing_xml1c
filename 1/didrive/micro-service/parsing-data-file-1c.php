@@ -22,7 +22,8 @@ try {
     if (isset($skip_start) && $skip_start === true) {
         
     } else {
-        require_once '0start.php';
+        //require_once '0start.php';
+        require_once $_SERVER['DOCUMENT_ROOT'].'/vendor/didrive/base/start-for-microservice.php';
         $skip_start = false;
     }
 

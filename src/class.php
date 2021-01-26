@@ -428,7 +428,6 @@ class parsing_xml1c {
                         elseif ($reader->nodeType == \XMLReader::ELEMENT && $reader->name == 'item') {
 
                             $d1 = [];
-
                             $node = (array) new \SimpleXMLElement($reader->readOuterXML());
 
                             if (!empty($node['name'])) {
@@ -436,12 +435,18 @@ class parsing_xml1c {
 
                                 if (!empty($node['@attributes']))
                                     foreach ($node['@attributes'] as $k1 => $v1) {
+                                    
+                                    $v1 = trim($v1);
 
-                                        if (!empty($v1) && $v1 != '' )
+                                        if ( !empty($v1) && $v1 != '' ){
                                             $d1['a_' . strtolower($k1) ] = $v1;
+                                            if( strtolower($k1) == 'catnumber' ){
+                                                $d1['catnumber_search' ] = strtolower(\f\translit($v1,'uri3'));
+                                            }
+                                        }
                                     }
                             }
-
+                            
                             $items[] = $d1;
                         }
                     }
