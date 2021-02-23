@@ -13,6 +13,11 @@ class parsing_xml1c {
 
     public static $mod_cats = '020.cats';
     public static $mod_items = '021.items';
+    /**
+     * модуль где храним аналоги
+     * @var type 
+     */
+    public static $mod_items_analogi = '021.items_analogs';
 
 //    public static $dir_img_server = false;
 //
@@ -58,6 +63,7 @@ class parsing_xml1c {
 
                 if (isset($_REQUEST['show']))
                     echo '<div style="border: 1px solid red; padding: 15px; margin: 15px;" >';
+
 
                 \f\timer_start(2);
 
@@ -371,7 +377,7 @@ class parsing_xml1c {
         if (!is_dir($sc))
             throw new \Exception('нет папки ' . $sc, 1);
 
-        $cats = $items = [];
+        $analogs = $cats = $items = [];
 
         $data_file = '';
 
@@ -381,7 +387,7 @@ class parsing_xml1c {
             $sc_scan = scandir($sc);
 
             $start1 = false;
-            
+
             foreach ($sc_scan as $k => $file) {
 
                 if (strpos($file, '.old.') !== false)
@@ -392,17 +398,16 @@ class parsing_xml1c {
                     $start1 = true;
                     $data_file = $file;
                     $est_xml_file = true;
-                    
+
                     $reader = new \XMLReader();
 
-                    if ( !$reader->open($sc . $file) )
-                        throw new \Exception('Failed to open ' . $sc . $file );
+                    if (!$reader->open($sc . $file))
+                        throw new \Exception('Failed to open ' . $sc . $file);
 
                     $d = ['id' => 0, 'parentId' => 0, 'name' => 'head'];
                     $d_item = ['id' => 0, 'categoryId' => 0, 'price' => 0, 'in_stock' => 0];
 
-                    $cats = [];
-                    $items = [];
+                    $analogs = $cats = $items = [];
 
                     while ($reader->read()) {
 
@@ -433,20 +438,54 @@ class parsing_xml1c {
                             if (!empty($node['name'])) {
                                 $d1['head'] = $node['name'];
 
-                                if (!empty($node['@attributes']))
+                                if (!empty($node['@attributes'])) {
                                     foreach ($node['@attributes'] as $k1 => $v1) {
-                                    
-                                    $v1 = trim($v1);
 
-                                        if ( !empty($v1) && $v1 != '' ){
-                                            $d1['a_' . strtolower($k1) ] = $v1;
-                                            if( strtolower($k1) == 'catnumber' ){
-                                                $d1['catnumber_search' ] = strtolower(\f\translit($v1,'uri3'));
+                                        $v1 = trim($v1);
+
+                                        if (!empty($v1) && $v1 != '') {
+
+                                            $d1['a_' . strtolower($k1)] = $v1;
+
+                                            if (strtolower($k1) == 'catnumber') {
+                                                $an_origin = $d1['catnumber_search'] = strtolower(\f\translit($v1, 'uri3'));
+                                            }
+
+                                            if (strtolower($k1) == 'arrayanalog') {
+
+                                                $an_items = explode(',', $v1);
+                                                //\f\pa( [ $node , $an_items ] );
+                                                // $analogs[ $node['@attributes']['catNumber'] ?? '' ] = $an_items;
+
+                                                foreach ($an_items as $analog1) {
+                                                    $analogs[] = [
+                                                        'art_origin' => $node['@attributes']['catNumber'],
+                                                        'art_analog' => $analog1
+                                                    ];
+                                                    
+                                                }
                                             }
                                         }
                                     }
+
+
+//                                            if( strtolower($k1) == 'arrayanalog' ){
+//                                                
+//                                                $list0 = explode( ',', $v1 );
+//                                                
+//                                                foreach( $list0 as $a ){
+//                                                    
+//                                                $analogs[] = [
+//                                                    'art_origin' => strtolower(\f\translit(trim($v1),'uri3')),
+//                                                    'art_analog' => strtolower(\f\translit(trim($v1),'uri3'))
+//                                                ];
+//                                                
+//                                                $d1['catnumber_search' ] = '';
+//                                                }
+//                                            }
+                                }
                             }
-                            
+
                             $items[] = $d1;
                         }
                     }
@@ -454,17 +493,16 @@ class parsing_xml1c {
                     // echo '<br/>#' . __LINE__;
 
                     $reader->close();
-                    
+
                     rename( $sc.$file , $sc.$file.'.old.'.date('Ymd.his').'.xml' );
-                    
+
                     break;
                 }
-                
             }
 
-            if ( $start1 === false )
-                throw new \Exception('Не обнаружен файл для обработки' );
-            
+            if ($start1 === false)
+                throw new \Exception('Не обнаружен файл для обработки');
+
 //            \f\pa([
 //                'cats' => $cats,
 //                    // 'items' => $items 
@@ -480,6 +518,7 @@ class parsing_xml1c {
                     'file' => $data_file,
                     'cats' => $cats ?? [],
                     'items' => $items ?? [],
+                    'analogs' => $analogs ?? [],
                     'time' => \f\timer_stop(789)
                 ]
         );
