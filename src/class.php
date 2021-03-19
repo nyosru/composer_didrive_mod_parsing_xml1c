@@ -13,6 +13,7 @@ class parsing_xml1c {
 
     public static $mod_cats = '020.cats';
     public static $mod_items = '021.items';
+
     /**
      * модуль где храним аналоги
      * @var type 
@@ -386,6 +387,9 @@ class parsing_xml1c {
 
             $sc_scan = scandir($sc);
 
+            if (!empty($_REQUEST['show1']))
+                \f\pa($sc_scan, 2, '', 'список дата файлов');
+
             $start1 = false;
 
             foreach ($sc_scan as $k => $file) {
@@ -436,7 +440,23 @@ class parsing_xml1c {
                             $node = (array) new \SimpleXMLElement($reader->readOuterXML());
 
                             if (!empty($node['name'])) {
+
+                                if (!empty($_REQUEST['show_parse_item'])) {
+
+                                    if (!isset($nn_show_parse_item)) {
+                                        $nn_show_parse_item = 0;
+                                    } else {
+                                        $nn_show_parse_item++;
+                                    }
+
+                                    if ($nn_show_parse_item <= 50)
+                                        \f\pa($node, 2, '', 'item перед парсингом');
+                                }
+
                                 $d1['head'] = $node['name'];
+
+                                if (!empty($node['Comment']) && $node['Comment'] != 1 )
+                                    $d1['comment'] = (string) $node['Comment'];
 
                                 if (!empty($node['@attributes'])) {
                                     foreach ($node['@attributes'] as $k1 => $v1) {
@@ -462,7 +482,6 @@ class parsing_xml1c {
                                                         'art_origin' => $node['@attributes']['catNumber'],
                                                         'art_analog' => $analog1
                                                     ];
-                                                    
                                                 }
                                             }
                                         }
@@ -494,7 +513,8 @@ class parsing_xml1c {
 
                     $reader->close();
 
-                    rename( $sc.$file , $sc.$file.'.old.'.date('Ymd.his').'.xml' );
+                    if (empty($_REQUEST['skip_rename']))
+                        rename($sc . $file, $sc . $file . '.old.' . date('Ymd.his') . '.xml');
 
                     break;
                 }
@@ -511,6 +531,13 @@ class parsing_xml1c {
 //                // 'cats' => $cats, 
 //                'items' => $items
 //                    ], 2, '', 'item items' 0);
+        }
+
+        if (!empty($_REQUEST['show1'])) {
+            \f\pa($data_file, 2, '', 'file какие данные получили из здата файла');
+            \f\pa($cats ?? [], 2, '', 'cats какие данные получили из здата файла');
+            \f\pa($items ?? [], 2, '', '$items какие данные получили из здата файла');
+            \f\pa($analogs ?? [], 2, '', '$analogs какие данные получили из здата файла');
         }
 
         return \f\end3('обработ', true,

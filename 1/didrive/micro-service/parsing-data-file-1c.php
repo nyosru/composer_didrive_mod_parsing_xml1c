@@ -37,7 +37,7 @@ try {
         \Nyos\nyos::getMenu();
 
         $res = Nyos\mod\parsing_xml1c::scanNewDataFile($db, \Nyos\Nyos::$folder_now);
-        //\f\pa($res, 2);
+        // \f\pa($res, 2);
 
         if (!empty($res['data']['cats'])) {
 
@@ -77,19 +77,26 @@ try {
         $msg = 'Обработано каталогов:' . sizeof($res['data']['cats']) . ' '
                 . ' товаров: ' . sizeof($res['data']['items']);
 
+        if( empty($_REQUEST['no_send_msg']) )
         \nyos\Msg::sendTelegramm($msg, null, 2);
 
         die($msg);
-    } 
+    }
     //
     catch (\Exception $exc) {
 
         \nyos\Msg::sendTelegramm('произошла ошибка ' . $exc->getMessage(), null, 2);
         \f\pa('ошибка ' . $exc->getMessage());
-
     }
+}
+//
+catch (\Exception $exc) {
 
-    die('die end ' . __FILE__ . ' #' . __LINE__);
+    \nyos\Msg::sendTelegramm('произошла ошибка ' . $exc->getMessage(), null, 2);
+    \f\pa('ошибка ' . $exc->getMessage());
+}
+
+die('die end ' . __FILE__ . ' #' . __LINE__);
 
 //
 //// \f\pa($_REQUEST);
