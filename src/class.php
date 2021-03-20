@@ -455,8 +455,11 @@ class parsing_xml1c {
 
                                 $d1['head'] = $node['name'];
 
-                                if (!empty($node['Comment']) && $node['Comment'] != 1 )
-                                    $d1['comment'] = (string) $node['Comment'];
+                                if (!empty($node['Comment']) && $node['Comment'] != 1 ){
+                                    $d1['comment'] = nl2br ( $node['Comment'] );
+                                    //\f\pa($d1['comment']);
+                                 // \f\pa(nl2br ( $node['Comment'] ));
+                                }
 
                                 if (!empty($node['@attributes'])) {
                                     foreach ($node['@attributes'] as $k1 => $v1) {
