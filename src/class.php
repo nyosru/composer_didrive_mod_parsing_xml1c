@@ -471,7 +471,7 @@ class parsing_xml1c {
                                             $d1['a_' . strtolower($k1)] = $v1;
 
                                             if (strtolower($k1) == 'catnumber') {
-                                                $an_origin = $d1['catnumber_search'] = strtolower(\f\translit($v1, 'uri3'));
+                                                $an_origin = $d1['catnumber_search'] = strtolower(\f\translit( $v1 , 'uri3'));
                                             }
 
                                             if (strtolower($k1) == 'arrayanalog') {
