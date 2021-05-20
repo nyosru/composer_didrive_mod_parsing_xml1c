@@ -37,7 +37,6 @@ try {
         \Nyos\nyos::getMenu();
 
         $res = Nyos\mod\parsing_xml1c::scanNewDataFile($db, \Nyos\Nyos::$folder_now);
-        // \f\pa($res, 2);
 
         if (!empty($res['data']['cats'])) {
 
@@ -95,4 +94,5 @@ catch (\Exception $exc) {
     \f\pa('ошибка ' . $exc->getMessage());
 }
 
+die();
 die('die end ' . __FILE__ . ' #' . __LINE__);

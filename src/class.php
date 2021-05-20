@@ -449,8 +449,11 @@ class parsing_xml1c {
                                         $nn_show_parse_item++;
                                     }
 
-                                    if ($nn_show_parse_item <= 50)
+                                    if ($nn_show_parse_item <= 50 
+                                    // && !empty($node['@attributes']['manufacturer'])
+                                    )
                                         \f\pa($node, 2, '', 'item перед парсингом');
+                                        
                                 }
 
                                 $d1['head'] = $node['name'];
@@ -467,6 +470,16 @@ class parsing_xml1c {
                                         $v1 = trim($v1);
 
                                         if (!empty($v1) && $v1 != '') {
+
+                                            if (strtolower($k1) == 'manufacturer') {
+                                                $d1['manufacturer'] = trim($v1);
+                                                continue;
+                                            }
+
+                                            if (strtolower($k1) == 'countryManuf') {
+                                                $d1['country'] = trim($v1);
+                                                continue;
+                                            }
 
                                             $d1['a_' . strtolower($k1)] = $v1;
 

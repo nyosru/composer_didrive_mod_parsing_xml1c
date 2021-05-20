@@ -1,7 +1,7 @@
 {
     "name": "didrive_mod/parsing_xml1c",
     "description": "пасинг дата файлов экспорта с 1с - сайт для авто АС",
-    "version": "2.7.0",
+    "version": "2.8.0",
     "keywords": [
         "didrive", "module", "nyos", "uralweb.info"
     ],
@@ -13,14 +13,14 @@
             "role": "Developer"
         }
     ],
+
     "homepage": "https://uralweb.info/php/#classes",
     "license": "MIT",
     "require": {
-        
-        "php": ">=7.3.0"
-        
+        "php": ">=7.3.0"        
     }
     ,
+
     "autoload": {
         "files": [  "src/class.php" ]
     }
